@@ -28,7 +28,6 @@
 #include <ucontext.h>
 
 #include <cstdio>
-#include <functional>
 #include <stdexcept>
 
 #include "coroutine.h"
@@ -107,9 +106,7 @@ struct decode_impl::state : public util::coroutine {
         return f < 0.5;
     }
 
-    typedef std::function<bool(float)> predicate;
-
-    int count_until(predicate fn, int max = -1)
+    int count_until(bool (*fn)(float), int max = -1)
     {
         int count = 0;
         while (!fn(next()) && (max == -1 || count < max)) {
@@ -121,7 +118,7 @@ struct decode_impl::state : public util::coroutine {
         return count;
     }
 
-    void wait_until(predicate fn, int max = -1)
+    void wait_until(bool (*fn)(float), int max = -1)
     {
         (void)count_until(fn, max);
     }
