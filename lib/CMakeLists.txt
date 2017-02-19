@@ -27,6 +27,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 list(APPEND ook_sources
     decode_impl.cc
+    debug.cc
 )
 
 
@@ -39,11 +40,15 @@ endif(NOT ook_sources)
 add_library(gnuradio-ook SHARED ${ook_sources})
 target_link_libraries(gnuradio-ook ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
 set_target_properties(gnuradio-ook PROPERTIES DEFINE_SYMBOL "gnuradio_ook_EXPORTS")
-set_source_files_properties(
-    decode_impl.cc
-    PROPERTIES
-    COMPILE_FLAGS
-    "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Werror")
+
+
+foreach(source_file ${ook_sources})
+    set_source_files_properties(
+        ${source_file}
+        PROPERTIES
+        COMPILE_FLAGS
+        "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Werror")
+endforeach(source_file)
 
 if(APPLE)
     set_target_properties(gnuradio-ook PROPERTIES

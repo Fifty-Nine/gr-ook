@@ -26,19 +26,20 @@
 #include <cassert>
 #include <deque>
 #include <ucontext.h>
-#include "decode_impl.h"
 
 #include <cstdio>
 #include <functional>
 #include <stdexcept>
 
+#include "debug.h"
+#include "decode_impl.h"
+
 using namespace gr;
 using namespace gr::ook;
+using namespace gr::ook::util;
 
 namespace
 {
-const bool debug_enabled = getenv("OOK_DECODE_DEBUG") != 0;
-
 bool within_range(double act, double exp, double tolerance)
 {
     double max = exp * (1.0f + tolerance);
@@ -58,18 +59,6 @@ struct too_many_bits_error : public std::runtime_error {
     {
     }
 };
-
-void debug(const char* fmt, ...)
-{
-    if (!debug_enabled) return;
-
-    fprintf(stderr, "debug: ");
-
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-}
 }
 
 struct decode_impl::state {
@@ -194,7 +183,7 @@ struct decode_impl::state {
             inst->run();
         } catch (const timeout_error& err) {
         } catch (const std::exception& ex) {
-            debug("unhandled exception: %s\n", ex.what());
+            debug(debug_flags::decode, "unhandled exception: %s\n", ex.what());
         }
     }
 
@@ -241,8 +230,11 @@ struct decode_impl::state {
             } else if (within_range(hi, zero_width, 0.1)) {
                 logic_val = false;
             } else {
-                debug("Signal did not go low when expected.\n");
                 debug(
+                  debug_flags::decode,
+                  "Signal did not go low when expected.\n");
+                debug(
+                  debug_flags::decode,
                   "hi(%d) one(%d) zero(%d)\n",
                   hi,
                   (int)one_width,
@@ -264,8 +256,11 @@ struct decode_impl::state {
             } else if (within_range(lo, zero_width, 0.1)) {
             } else if (within_range(lo, one_width, 0.1)) {
             } else {
-                debug("Signal did not go high when expected.\n");
                 debug(
+                  debug_flags::decode,
+                  "Signal did not go high when expected.\n");
+                debug(
+                  debug_flags::decode,
                   "hi(%d) lo(%d) one(%d) zero(%d) preamb(%d)\n",
                   hi,
                   lo,
@@ -278,7 +273,7 @@ struct decode_impl::state {
             out.push_back(logic_val ? '1' : '0');
 
             if (out.size() > 1024) {
-                debug("Exceeded packet bit limit");
+                debug(debug_flags::decode, "Exceeded packet bit limit");
                 throw too_many_bits_error{};
             }
         }
@@ -297,7 +292,10 @@ struct decode_impl::state {
         int preamble_size = count_until(is_low, timeout);
         if (!within_range(preamble_size, 2.0 * detected_width, 0.1)) {
             debug(
-              "Bad preamble: %d != %d\n", preamble_size, 2 * detected_width);
+              debug_flags::decode,
+              "Bad preamble: %d != %d\n",
+              preamble_size,
+              2 * detected_width);
             return;
         }
 
