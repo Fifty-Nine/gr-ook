@@ -173,6 +173,8 @@ struct decode_impl::state : public util::coroutine {
             int lo_count = count_until(&is_high, wait_time);
 
             if (detected_width > 1 && lo_count > (1.7 * detected_width)) {
+                debug(
+                  debug_flags::decode, "detected sync %d\n:", detected_width);
                 return true;
             }
 
@@ -180,6 +182,12 @@ struct decode_impl::state : public util::coroutine {
             if (
               !within_range(hi_count, total / 2.0, 0.01) ||
               !within_range(lo_count, total / 2.0, 0.01)) {
+                debug(
+                  debug_flags::decode,
+                  "bad sync: hi(%d) lo(%d) avg(%d)\n",
+                  hi_count,
+                  lo_count,
+                  detected_width);
                 return false;
             }
 
@@ -274,11 +282,19 @@ struct decode_impl::state : public util::coroutine {
               preamble_size,
               2 * detected_width);
             return;
+        } else {
+            debug(
+              debug_flags::decode,
+              "preamble: actual(%d) expected(%d)\n",
+              preamble_size,
+              detected_width);
         }
 
         wait_until(&is_high, timeout);
 
+        debug(debug_flags::decode, "begin receive data\n");
         receive_data(packet_data);
+        debug(debug_flags::decode, "begin receive check\n");
         receive_data(packet_check);
 
         print_packet();
