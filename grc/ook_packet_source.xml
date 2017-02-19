@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<block>
+  <name>packet_source</name>
+  <key>ook_packet_source</key>
+  <category>ook</category>
+  <import>import ook</import>
+  <make>ook.packet_source($data, $sample_rate)</make>
+  <param>
+    <name>Packet Data</name>
+    <key>data</key>
+    <type>int_vector</type>
+  </param>
+  <param>
+    <name>Sample Rate</name>
+    <key>sample_rate</key>
+    <type>int</type>
+  </param>
+  <source>
+    <name>out</name>
+    <type>float</type>
+  </source>
+</block>

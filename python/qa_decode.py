@@ -23,7 +23,6 @@ from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 from time import sleep
 import ook_swig as ook
-from packet_source import packet_source
 
 class qa_decode (gr_unittest.TestCase):
 
@@ -34,6 +33,7 @@ class qa_decode (gr_unittest.TestCase):
         self.tb = None
 
     def test_basic (self):
+      print "Test sampled"
       src = blocks.file_source(
           gr.sizeof_float * 1,
           "/tank/data/file8_0_0.00000586.extended.dat",
@@ -55,18 +55,25 @@ class qa_decode (gr_unittest.TestCase):
       sleep(0.25)
       self.tb.stop()
       self.tb.wait()
-#
-#    def _data_test (self, data):
-#      src = packet_source(data)
-#      decode = ook.decode()
-#      self.tb.connect(src, decode)
-#      self.tb.run()
-#
-#    def test_patterns (self):
-#      self._data_test([0x00] * 11)
-#      self._data_test([0xff] * 11)
-#      self._data_test([0x55] * 11)
-#      self._data_test([0xAA] * 11)
+
+    def _data_test (self, data):
+      print "Test random"
+      src = ook.packet_source(data)
+      decode = ook.decode()
+      self.tb.connect(src, decode)
+      self.tb.run()
+
+    def test_patterns (self):
+      print "Test 0s"
+      self._data_test([0x0] * 11)
+      print "Test 1s"
+      self._data_test([0xf] * 11)
+      print "Test 01s"
+      self._data_test([0x5] * 11)
+      print "Test 10s"
+      self._data_test([0xA] * 11)
+      print "Test counter"
+      self._data_test([0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB])
 
 
 if __name__ == '__main__':

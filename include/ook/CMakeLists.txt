@@ -22,5 +22,6 @@
 ########################################################################
 install(FILES
     api.h
-    decode.h DESTINATION include/ook
+    decode.h
+    packet_source.h DESTINATION include/ook
 )

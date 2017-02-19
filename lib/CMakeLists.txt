@@ -29,6 +29,7 @@ list(APPEND ook_sources
     coroutine.cc
     debug.cc
     decode_impl.cc
+    packet_source_impl.cc
 )
 
 
@@ -41,7 +42,6 @@ endif(NOT ook_sources)
 add_library(gnuradio-ook SHARED ${ook_sources})
 target_link_libraries(gnuradio-ook ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
 set_target_properties(gnuradio-ook PROPERTIES DEFINE_SYMBOL "gnuradio_ook_EXPORTS")
-
 
 foreach(source_file ${ook_sources})
     set_source_files_properties(
