@@ -42,6 +42,10 @@ debug_flags::type init_debug_flags()
         result = (debug_flags::type)(result | debug_flags::decode);
     }
 
+    if (getenv("OOK_COROUTINE_DEBUG") != 0) {
+        result = (debug_flags::type)(result | debug_flags::coroutine);
+    }
+
     return result;
 }
 

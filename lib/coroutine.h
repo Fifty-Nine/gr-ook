@@ -18,8 +18,10 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef INCLUDED_OOK_DEBUG_H
-#define INCLUDED_OOK_DEBUG_H
+#ifndef INCLUDED_OOK_COROUTINE_H
+#define INCLUDED_OOK_COROUTINE_H
+
+#include <memory>
 
 namespace gr
 {
@@ -27,21 +29,28 @@ namespace ook
 {
 namespace util
 {
-namespace debug_flags
+class coroutine
 {
-enum type {
-    none = 0,
-    decode = 1 << 0,
-    coroutine = 1 << 1
+  private:
+    struct coroutine_impl;
+    std::unique_ptr<coroutine_impl> impl;
+
+    virtual void run() = 0;
+    virtual void on_exit() { }
+
+  public:
+    coroutine();
+    virtual ~coroutine();
+
+    void resume();
+
+  protected:
+    void reset();
+    void yield();
 };
-}
-
-bool debugEnabled(debug_flags::type);
-
-void debug(debug_flags::type from, const char* fmt, ...);
 
 } // namespace util
 } // namespace ook
 } // namespace gr
 
-#endif /* INCLUDED_OOK_DEBUG_H */
+#endif /* INCLUDED_OOK_COROUTINE_H */

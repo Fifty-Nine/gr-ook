@@ -31,6 +31,7 @@
 #include <functional>
 #include <stdexcept>
 
+#include "coroutine.h"
 #include "debug.h"
 #include "decode_impl.h"
 
@@ -61,19 +62,8 @@ struct too_many_bits_error : public std::runtime_error {
 };
 }
 
-struct decode_impl::state {
-    ~state()
-    {
-        print_packet();
-    }
-
+struct decode_impl::state : public util::coroutine {
     bool need_reset = false;
-    ucontext_t process_context;
-    ucontext_t reset_context;
-    ucontext_t main_context;
-
-    char pstack[1 << 14];
-    char fstack[1 << 10];
 
     const float* data = nullptr;
     const float* endptr = nullptr;
@@ -82,11 +72,6 @@ struct decode_impl::state {
     int detected_width = 0;
     std::vector<char> packet_data;
     std::vector<char> packet_check;
-
-    void yield()
-    {
-        swapcontext(&process_context, &main_context);
-    }
 
     bool hasNext() const
     {
@@ -167,24 +152,19 @@ struct decode_impl::state {
         printf("\n");
     }
 
-    static void call_run(state* inst)
+    virtual void run() override
     {
-        inst->reset_context.uc_stack.ss_sp = &inst->fstack;
-        inst->reset_context.uc_stack.ss_size = sizeof(inst->fstack);
-        inst->reset_context.uc_link = &inst->main_context;
-        makecontext(&inst->reset_context, (void (*)()) & fallthrough, 1, inst);
-        inst->sync_count = 0;
-        inst->packet_data.clear();
-        inst->packet_check.clear();
-        inst->packet_data.reserve(32);
-        inst->packet_check.reserve(32);
-
         try {
-            inst->run();
+            read_packet();
         } catch (const timeout_error& err) {
         } catch (const std::exception& ex) {
             debug(debug_flags::decode, "unhandled exception: %s\n", ex.what());
         }
+    }
+
+    virtual void on_exit() override
+    {
+        need_reset = true;
     }
 
     bool detect_sync_width()
@@ -279,7 +259,7 @@ struct decode_impl::state {
         }
     }
 
-    void run()
+    void read_packet()
     {
         wait_until(&is_high);
 
@@ -307,23 +287,6 @@ struct decode_impl::state {
         print_packet();
     }
 
-    static void fallthrough(state* inst)
-    {
-        inst->need_reset = true;
-    }
-
-    static void reset(state* inst)
-    {
-        inst->need_reset = false;
-        getcontext(&inst->main_context);
-        getcontext(&inst->process_context);
-        getcontext(&inst->reset_context);
-        inst->process_context.uc_stack.ss_sp = &inst->pstack;
-        inst->process_context.uc_stack.ss_size = sizeof(inst->pstack);
-        inst->process_context.uc_link = &inst->reset_context;
-        makecontext(&inst->process_context, (void (*)()) & call_run, 1, inst);
-    }
-
     void resume(const float* new_data, int size)
     {
         assert(!hasNext());
@@ -332,16 +295,12 @@ struct decode_impl::state {
         endptr = data + size;
 
         while (hasNext()) {
-            swapcontext(&main_context, &process_context);
+            coroutine::resume();
             if (need_reset) {
-                reset(this);
+                need_reset = false;
+                reset();
             }
         }
-    }
-
-    state()
-    {
-        reset(this);
     }
 };
 
