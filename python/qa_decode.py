@@ -41,11 +41,11 @@ class qa_decode (gr_unittest.TestCase):
       out = blocks.message_debug()
       self.tb.connect(src_block, decode)
       self.tb.msg_connect(decode, "packet_pretty", out, "store")
+      self.tb.msg_connect(decode, "phy_packet_pretty", out, "store")
       self.tb.run()
 
       for i in range(out.num_messages()):
         print out.get_message(i)
-        #print self._describe_packet(out.get_message(i))
 
     def _data_test (self, data):
       self._run_test(ook.packet_source(data))

@@ -79,6 +79,7 @@ struct decode_impl::worker : public util::coroutine {
     pmt::pmt_t data_sym = pmt::mp("packet_data");
     pmt::pmt_t pretty_sym = pmt::mp("packet_pretty");
     pmt::pmt_t meta_sym = pmt::mp("packet_meta");
+    pmt::pmt_t phy_pretty_sym = pmt::mp("phy_packet_pretty");
     std::deque<std::pair<pmt::pmt_t, pmt::pmt_t>> packet_queue;
 
     virtual void on_reset() override
@@ -141,36 +142,27 @@ struct decode_impl::worker : public util::coroutine {
         (void)count_until(fn, max);
     }
 
-    void debug_print_packet()
+    std::string phy_pretty_packet()
     {
-        std::cerr << std::setw(2) << sync_count << "SP ";
+        std::ostringstream os;
+        os << std::setw(2) << sync_count << "SP ";
         for (size_t idx = 0;
              idx < std::max(packet_data.size(), packet_check.size());) {
             if (idx >= packet_data.size()) {
-                std::cerr << "C";
+                os << "C";
             } else if (idx >= packet_check.size()) {
-                std::cerr << "D";
+                os << "D";
             } else if (packet_data[idx] != packet_check[idx]) {
-                std::cerr << "X";
+                os << "X";
             } else {
-                std::cerr << (packet_data[idx] ? '1' : '0');
+                os << (packet_data[idx] ? '1' : '0');
             }
 
             if (++idx % 4 == 0) {
-                std::cerr << " ";
+                os << " ";
             }
         }
-        std::cerr << "\n";
-    }
-
-    void push_bit(bool bit, uint8_t& c, size_t idx, std::vector<uint8_t>& out)
-    {
-        c <<= 1;
-        c |= bit;
-        if (((idx + 1) % 8) == 0) {
-            out.push_back(c);
-            c = 0;
-        }
+        return os.str();
     }
 
     pmt::pmt_t pretty_packet(const std::vector<uint8_t> data, bool check_valid)
@@ -199,6 +191,16 @@ struct decode_impl::worker : public util::coroutine {
             meta, pmt::mp("valid_check"), pmt::from_bool(check_valid)
         );
         return meta;
+    }
+
+    void push_bit(bool bit, uint8_t& c, size_t idx, std::vector<uint8_t>& out)
+    {
+        c <<= 1;
+        c |= bit;
+        if (((idx + 1) % 8) == 0) {
+            out.push_back(c);
+            c = 0;
+        }
     }
 
     void produce_packet()
@@ -240,7 +242,12 @@ struct decode_impl::worker : public util::coroutine {
             meta_sym, meta_packet(check_valid)
         );
 
-        if (debugEnabled(debug_flags::decode)) debug_print_packet();
+        auto phy_packet = phy_pretty_packet();
+        debug(debug_flags::decode, "phy: %s\n", phy_packet.c_str());
+
+        packet_queue.emplace_back(
+            phy_pretty_sym, pmt::mp(phy_packet)
+        );
     }
 
     virtual void run() override
@@ -441,6 +448,7 @@ decode_impl::decode_impl(double tolerance)
 {
     message_port_register_out(worker_->data_sym);
     message_port_register_out(worker_->pretty_sym);
+    message_port_register_out(worker_->phy_pretty_sym);
     message_port_register_out(worker_->meta_sym);
 }
 
