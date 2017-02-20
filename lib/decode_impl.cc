@@ -60,8 +60,8 @@ struct too_many_bits_error : public std::runtime_error {
 };
 }
 
-struct decode_impl::state : public util::coroutine {
-    state(double tolerance_) : tolerance(tolerance_)
+struct decode_impl::worker : public util::coroutine {
+    worker(double tolerance_) : tolerance(tolerance_)
     {
     }
 
@@ -420,11 +420,11 @@ decode_impl::decode_impl(double tolerance)
         "decode",
         gr::io_signature::make(1, 1, sizeof(float)),
         gr::io_signature::make(0, 0, 0)),
-      state_(new state{tolerance})
+      worker_(new worker{tolerance})
 {
-    message_port_register_out(state_->data_sym);
-    message_port_register_out(state_->pretty_sym);
-    message_port_register_out(state_->meta_sym);
+    message_port_register_out(worker_->data_sym);
+    message_port_register_out(worker_->pretty_sym);
+    message_port_register_out(worker_->meta_sym);
 }
 
 /*
@@ -446,10 +446,10 @@ int decode_impl::general_work(
   gr_vector_const_void_star& input_items,
   gr_vector_void_star& output_items)
 {
-    state_->resume((const float*)input_items[0], ninput_items[0]);
+    worker_->resume((const float*)input_items[0], ninput_items[0]);
 
-    while (state_->has_packet()) {
-        auto packet = state_->next_packet();
+    while (worker_->has_packet()) {
+        auto packet = worker_->next_packet();
         message_port_pub(packet.first, packet.second);
     }
 

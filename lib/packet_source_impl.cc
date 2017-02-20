@@ -32,14 +32,14 @@ namespace gr
 {
 namespace ook
 {
-struct packet_source_impl::impl : public util::coroutine {
+struct packet_source_impl::worker : public util::coroutine {
     std::vector<char> in;
     const int ms;
 
     float* out;
     float* endptr;
 
-    impl(const std::vector<char>& init_data, int sample_rate)
+    worker(const std::vector<char>& init_data, int sample_rate)
         : in(init_data.begin(), init_data.end()),
           ms(sample_rate / 1000),
           out(nullptr),
@@ -178,7 +178,7 @@ packet_source_impl::packet_source_impl(
         "packet_source",
         gr::io_signature::make(0, 0, 0),
         gr::io_signature::make(1, 1, sizeof(float))),
-      impl_(new impl{data, sample_rate})
+      worker_(new worker{data, sample_rate})
 {
 }
 
@@ -195,7 +195,7 @@ int packet_source_impl::work(
   gr_vector_void_star& output_items)
 {
     int result =
-      impl_->resume(reinterpret_cast<float*>(output_items[0]), noutput_items);
+      worker_->resume(reinterpret_cast<float*>(output_items[0]), noutput_items);
 
     if (!result) return -1;
     return result;

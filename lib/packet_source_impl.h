@@ -31,8 +31,8 @@ namespace ook
 class packet_source_impl : public packet_source
 {
   private:
-    struct impl;
-    std::unique_ptr<impl> impl_;
+    struct worker;
+    std::unique_ptr<worker> worker_;
 
   public:
     packet_source_impl(const std::vector<char>& nibbles, int sample_rate = 32000);

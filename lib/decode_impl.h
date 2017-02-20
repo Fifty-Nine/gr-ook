@@ -31,8 +31,8 @@ namespace ook
 class decode_impl : public decode
 {
   private:
-    struct state;
-    std::unique_ptr<state> state_;
+    struct worker;
+    std::unique_ptr<worker> worker_;
 
   public:
     decode_impl(double tolerance = 0.1);
