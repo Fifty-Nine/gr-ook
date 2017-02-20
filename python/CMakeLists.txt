@@ -41,4 +41,5 @@ include(GrTest)
 
 set(GR_TEST_TARGET_DEPS gnuradio-ook)
 set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
+set(GR_TEST_ENVIRONS "OOK_TEST_SAMPLES_DIR=\"${CMAKE_SOURCE_DIR}/test-samples\"")
 GR_ADD_TEST(qa_decode ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_decode.py)

@@ -24,6 +24,9 @@ from gnuradio import blocks
 from time import sleep
 import ook_swig as ook
 
+import os, sys, fnmatch
+from fnmatch import fnmatch
+
 class qa_decode (gr_unittest.TestCase):
 
     def setUp (self):
@@ -32,18 +35,28 @@ class qa_decode (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def test_basic (self):
-      print "Test sampled"
-      src = blocks.file_source(
-          gr.sizeof_float * 1,
-          "/tank/data/file8_0_0.00000586.extended.dat",
-          False
-      )
-      decode = ook.decode()
-      self.tb.connect(src, decode)
-      self.tb.run()
+    def test_samples (self):
+      print "Test samples"
+      samples_dir = os.environ["OOK_TEST_SAMPLES_DIR"]
+      files = os.listdir(samples_dir)
 
+      for f in files:
+        if not fnmatch(f, '*.cf32'):
+          continue
+        print "Testing {0}".format(f)
+        src = blocks.file_source(
+            gr.sizeof_float * 1,
+            os.path.join(samples_dir, f),
+            False
+        )
+        decode = ook.decode(tolerance=0.25)
+        self.tb.connect(src, decode)
+        self.tb.start()
+        self.tb.wait()
+        sys.stdout.flush()
+      
     def test_random (self):
+      print "Test random"
       src = blocks.file_source(
           gr.sizeof_float * 1,
           "/dev/urandom",
@@ -57,7 +70,6 @@ class qa_decode (gr_unittest.TestCase):
       self.tb.wait()
 
     def _data_test (self, data):
-      print "Test random"
       src = ook.packet_source(data)
       decode = ook.decode()
       self.tb.connect(src, decode)
