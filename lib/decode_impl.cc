@@ -432,7 +432,6 @@ decode_impl::decode_impl(double tolerance)
  */
 decode_impl::~decode_impl()
 {
-    delete state_;
 }
 
 void decode_impl::forecast(

@@ -22,6 +22,7 @@
 #define INCLUDED_OOK_PACKET_SOURCE_IMPL_H
 
 #include <ook/packet_source.h>
+#include <memory>
 
 namespace gr
 {
@@ -31,7 +32,7 @@ class packet_source_impl : public packet_source
 {
   private:
     struct impl;
-    struct impl* impl_;
+    std::unique_ptr<impl> impl_;
 
   public:
     packet_source_impl(const std::vector<char>& nibbles, int sample_rate = 32000);

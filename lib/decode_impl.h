@@ -22,6 +22,7 @@
 #define INCLUDED_OOK_DECODE_IMPL_H
 
 #include <ook/decode.h>
+#include <memory>
 
 namespace gr
 {
@@ -31,7 +32,7 @@ class decode_impl : public decode
 {
   private:
     struct state;
-    state* state_;
+    std::unique_ptr<state> state_;
 
   public:
     decode_impl(double tolerance = 0.1);

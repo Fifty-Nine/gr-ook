@@ -187,7 +187,6 @@ packet_source_impl::packet_source_impl(
  */
 packet_source_impl::~packet_source_impl()
 {
-    delete impl_;
 }
 
 int packet_source_impl::work(
