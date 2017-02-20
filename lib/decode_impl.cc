@@ -327,11 +327,6 @@ struct decode_impl::state : public util::coroutine {
             }
         }
     }
-
-    ~state()
-    {
-        print_packet();
-    }
 };
 
 decode::sptr decode::make(double tolerance)
