@@ -139,10 +139,7 @@ struct decode_impl::state : public util::coroutine {
 
     void print_packet()
     {
-        for (int i = 0; i < sync_count; ++i) {
-            printf("S");
-        }
-        printf("P ");
+        printf("%2.2dSP ", sync_count);
 
         for (size_t idx = 0;
              idx < std::max(packet_data.size(), packet_check.size());) {
