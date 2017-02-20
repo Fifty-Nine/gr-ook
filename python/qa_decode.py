@@ -62,7 +62,7 @@ class qa_decode (gr_unittest.TestCase):
     def test_samples (self):
       print "Test samples"
       samples_dir = os.environ["OOK_TEST_SAMPLES_DIR"]
-      files = [f for f in os.listdir(samples_dir) if fnmatch(f, '*.cf32')]
+      files = [f for f in os.listdir(samples_dir) if fnmatch(f, '*.f32')]
       for f in files:
         self._file_test(os.path.join(samples_dir, f))
 
