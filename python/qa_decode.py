@@ -26,6 +26,7 @@ import ook_swig as ook
 
 import os, sys, fnmatch
 from fnmatch import fnmatch
+import pmt
 
 class qa_decode (gr_unittest.TestCase):
 
@@ -35,26 +36,36 @@ class qa_decode (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
+    def _run_test (self, src_block):
+      decode = ook.decode(0.25)
+      out = blocks.message_debug()
+      self.tb.connect(src_block, decode)
+      self.tb.msg_connect(decode, "packet_pretty", out, "store")
+      self.tb.run()
+
+      for i in range(out.num_messages()):
+        print out.get_message(i)
+        #print self._describe_packet(out.get_message(i))
+
+    def _data_test (self, data):
+      self._run_test(ook.packet_source(data))
+
+    def _file_test (self, filename):
+      print "Testing {0}".format(filename)
+      src = blocks.file_source(
+          gr.sizeof_float * 1,
+          filename,
+          False
+      )
+      self._run_test(src)
+
     def test_samples (self):
       print "Test samples"
       samples_dir = os.environ["OOK_TEST_SAMPLES_DIR"]
-      files = os.listdir(samples_dir)
-
+      files = [f for f in os.listdir(samples_dir) if fnmatch(f, '*.cf32')]
       for f in files:
-        if not fnmatch(f, '*.cf32'):
-          continue
-        print "Testing {0}".format(f)
-        src = blocks.file_source(
-            gr.sizeof_float * 1,
-            os.path.join(samples_dir, f),
-            False
-        )
-        decode = ook.decode(tolerance=0.25)
-        self.tb.connect(src, decode)
-        self.tb.start()
-        self.tb.wait()
-        sys.stdout.flush()
-      
+        self._file_test(os.path.join(samples_dir, f))
+
     def test_random (self):
       print "Test random"
       src = blocks.file_source(
@@ -63,17 +74,12 @@ class qa_decode (gr_unittest.TestCase):
           False
       )
       decode = ook.decode()
+      out = blocks.message_debug()
       self.tb.connect(src, decode)
       self.tb.start()
       sleep(0.25)
       self.tb.stop()
       self.tb.wait()
-
-    def _data_test (self, data):
-      src = ook.packet_source(data)
-      decode = ook.decode()
-      self.tb.connect(src, decode)
-      self.tb.run()
 
     def test_patterns (self):
       print "Test 0s"

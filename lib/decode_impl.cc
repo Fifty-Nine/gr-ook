@@ -24,11 +24,10 @@
 
 #include <gnuradio/io_signature.h>
 #include <cassert>
-#include <deque>
-#include <ucontext.h>
-
 #include <cstdio>
+#include <deque>
 #include <stdexcept>
+#include <ucontext.h>
 
 #include "coroutine.h"
 #include "debug.h"
@@ -76,6 +75,11 @@ struct decode_impl::state : public util::coroutine {
     int detected_width = 0;
     std::vector<char> packet_data;
     std::vector<char> packet_check;
+
+    pmt::pmt_t data_sym = pmt::mp("packet_data");
+    pmt::pmt_t pretty_sym = pmt::mp("packet_pretty");
+    pmt::pmt_t meta_sym = pmt::mp("packet_meta");
+    std::deque<std::pair<pmt::pmt_t, pmt::pmt_t>> packet_queue;
 
     virtual void on_reset() override
     {
@@ -137,27 +141,89 @@ struct decode_impl::state : public util::coroutine {
         (void)count_until(fn, max);
     }
 
-    void print_packet()
+    void debug_print_packet()
     {
-        printf("%2.2dSP ", sync_count);
-
+        std::cerr << std::setw(2) << sync_count << "SP ";
         for (size_t idx = 0;
              idx < std::max(packet_data.size(), packet_check.size());) {
             if (idx >= packet_data.size()) {
-                printf("C");
+                std::cerr << "C";
             } else if (idx >= packet_check.size()) {
-                printf("D");
+                std::cerr << "D";
             } else if (packet_data[idx] != packet_check[idx]) {
-                printf("X");
+                std::cerr << "X";
             } else {
-                printf("%c", packet_data[idx]);
+                std::cerr << (packet_data[idx] ? '1' : '0');
             }
 
             if (++idx % 4 == 0) {
-                printf(" ");
+                std::cerr << " ";
             }
         }
-        printf("\n");
+        std::cerr << "\n";
+    }
+
+    void push_bit(bool bit, uint8_t& c, size_t idx, std::vector<uint8_t>& out)
+    {
+        c <<= 1;
+        c |= bit;
+        if (((idx + 1) % 8) == 0) {
+            out.push_back(c);
+            c = 0;
+        }
+    }
+
+    void produce_packet()
+    {
+        bool check_valid = true;
+
+        const size_t num_bytes =
+          (packet_data.size() / 8) + ((packet_data.size() % 8) != 0);
+        uint8_t byte = 0;
+        size_t idx = 0;
+        std::vector<uint8_t> data;
+        data.reserve(num_bytes);
+        for (; idx < packet_data.size(); idx++) {
+            if (idx >= packet_data.size()) {
+                check_valid = false;
+                break;
+            }
+
+            if (
+              idx >= packet_check.size() ||
+              packet_data[idx] != packet_check[idx]) {
+                check_valid = false;
+            }
+
+            push_bit(packet_data[idx], byte, idx, data);
+        }
+
+        while (data.size() < num_bytes) {
+            push_bit(0, byte, idx++, data);
+        }
+
+        std::ostringstream os;
+        os << std::setfill('0');
+        os << std::setw(2) << sync_count << "S ";
+        os << std::setw(3) << packet_data.size() << "B ";
+        os << (int)check_valid << "C ";
+        for (auto c : data) {
+            os << std::hex << std::setw(2) << (int)c << " ";
+        }
+
+        packet_queue.emplace_back(pretty_sym, pmt::mp(os.str()));
+        packet_queue.emplace_back(
+          data_sym, pmt::init_u8vector(data.size(), data));
+
+        auto meta = pmt::make_dict();
+        meta =
+          dict_add(meta, pmt::mp("bit_count"), pmt::mp(packet_data.size()));
+        meta = dict_add(meta, pmt::mp("sync_count"), pmt::mp(sync_count));
+        meta =
+          dict_add(meta, pmt::mp("valid_check"), pmt::from_bool(check_valid));
+
+        packet_queue.emplace_back(meta_sym, meta);
+        if (debugEnabled(debug_flags::decode)) debug_print_packet();
     }
 
     virtual void run() override
@@ -268,7 +334,7 @@ struct decode_impl::state : public util::coroutine {
                 return;
             }
 
-            out.push_back(logic_val ? '1' : '0');
+            out.push_back(logic_val);
 
             if (out.size() > 1024) {
                 debug(debug_flags::decode, "Exceeded packet bit limit");
@@ -310,7 +376,7 @@ struct decode_impl::state : public util::coroutine {
         debug(debug_flags::decode, "begin receive check\n");
         receive_data(packet_check);
 
-        print_packet();
+        produce_packet();
     }
 
     void resume(const float* new_data, int size)
@@ -326,6 +392,18 @@ struct decode_impl::state : public util::coroutine {
                 reset();
             }
         }
+    }
+
+    bool hasPacket()
+    {
+        return packet_queue.size();
+    }
+
+    std::pair<pmt::pmt_t, pmt::pmt_t> nextPacket()
+    {
+        auto result = packet_queue.front();
+        packet_queue.pop_front();
+        return result;
     }
 };
 
@@ -344,6 +422,9 @@ decode_impl::decode_impl(double tolerance)
         gr::io_signature::make(0, 0, 0)),
       state_(new state{tolerance})
 {
+    message_port_register_out(state_->data_sym);
+    message_port_register_out(state_->pretty_sym);
+    message_port_register_out(state_->meta_sym);
 }
 
 /*
@@ -367,6 +448,11 @@ int decode_impl::general_work(
   gr_vector_void_star& output_items)
 {
     state_->resume((const float*)input_items[0], ninput_items[0]);
+
+    while (state_->hasPacket()) {
+        auto packet = state_->nextPacket();
+        message_port_pub(packet.first, packet.second);
+    }
 
     // Tell runtime system how many input items we consumed on
     // each input stream.
