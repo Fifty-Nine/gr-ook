@@ -46,7 +46,7 @@ class OOK_API decode : virtual public gr::block
      * class. ook::decode::make is the public interface for
      * creating new instances.
      */
-    static sptr make();
+    static sptr make(double tolerance = 0.1);
 };
 
 } // namespace ook

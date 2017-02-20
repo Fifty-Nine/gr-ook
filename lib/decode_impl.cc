@@ -62,6 +62,11 @@ struct too_many_bits_error : public std::runtime_error {
 }
 
 struct decode_impl::state : public util::coroutine {
+    state(double tolerance_) : tolerance(tolerance_)
+    {
+    }
+
+    double tolerance;
     bool need_reset = false;
 
     const float* data = nullptr;
@@ -180,8 +185,8 @@ struct decode_impl::state : public util::coroutine {
 
             int total = hi_count + lo_count;
             if (
-              !within_range(hi_count, total / 2.0, 0.01) ||
-              !within_range(lo_count, total / 2.0, 0.01)) {
+              !within_range(hi_count, total / 2.0, tolerance) ||
+              !within_range(lo_count, total / 2.0, tolerance)) {
                 debug(
                   debug_flags::decode,
                   "bad sync: hi(%d) lo(%d) avg(%d)\n",
@@ -210,9 +215,9 @@ struct decode_impl::state : public util::coroutine {
             int hi = count_until(&is_low, timeout);
 
             bool logic_val;
-            if (within_range(hi, one_width, 0.1)) {
+            if (within_range(hi, one_width, tolerance)) {
                 logic_val = true;
-            } else if (within_range(hi, zero_width, 0.1)) {
+            } else if (within_range(hi, zero_width, tolerance)) {
                 logic_val = false;
             } else {
                 debug(
@@ -220,16 +225,17 @@ struct decode_impl::state : public util::coroutine {
                   "Signal did not go low when expected.\n");
                 debug(
                   debug_flags::decode,
-                  "hi(%d) one(%d) zero(%d)\n",
+                  "hi(%d) one(%d) zero(%d) bit(%d)\n",
                   hi,
                   (int)one_width,
-                  (int)zero_width);
+                  (int)zero_width,
+                  out.size());
                 return;
             }
 
             int lo = count_until(&is_high, timeout);
 
-            if (within_range(lo, preamb_width, 0.1)) {
+            if (within_range(lo, preamb_width, tolerance)) {
                 /* start of a mid-amble */
                 out.pop_back();
                 wait_until(&is_low, timeout);
@@ -238,20 +244,21 @@ struct decode_impl::state : public util::coroutine {
             } else if (lo > end_width) {
                 out.pop_back();
                 return;
-            } else if (within_range(lo, zero_width, 0.1)) {
-            } else if (within_range(lo, one_width, 0.1)) {
+            } else if (within_range(lo, zero_width, tolerance)) {
+            } else if (within_range(lo, one_width, tolerance)) {
             } else {
                 debug(
                   debug_flags::decode,
                   "Signal did not go high when expected.\n");
                 debug(
                   debug_flags::decode,
-                  "hi(%d) lo(%d) one(%d) zero(%d) preamb(%d)\n",
+                  "hi(%d) lo(%d) one(%d) zero(%d) preamb(%d) bit(%d)\n",
                   hi,
                   lo,
                   (int)one_width,
                   (int)zero_width,
-                  (int)preamb_width);
+                  (int)preamb_width,
+                  out.size());
                 return;
             }
 
@@ -275,7 +282,7 @@ struct decode_impl::state : public util::coroutine {
         int timeout = 4 * detected_width;
 
         int preamble_size = count_until(is_low, timeout);
-        if (!within_range(preamble_size, 2.0 * detected_width, 0.1)) {
+        if (!within_range(preamble_size, 2.0 * detected_width, tolerance)) {
             debug(
               debug_flags::decode,
               "Bad preamble: %d != %d\n",
@@ -287,7 +294,7 @@ struct decode_impl::state : public util::coroutine {
               debug_flags::decode,
               "preamble: actual(%d) expected(%d)\n",
               preamble_size,
-              detected_width);
+              2 * detected_width);
         }
 
         wait_until(&is_high, timeout);
@@ -315,22 +322,27 @@ struct decode_impl::state : public util::coroutine {
             }
         }
     }
+
+    ~state()
+    {
+        print_packet();
+    }
 };
 
-decode::sptr decode::make()
+decode::sptr decode::make(double tolerance)
 {
-    return gnuradio::get_initial_sptr(new decode_impl());
+    return gnuradio::get_initial_sptr(new decode_impl(tolerance));
 }
 
 /*
  * The private constructor
  */
-decode_impl::decode_impl()
+decode_impl::decode_impl(double tolerance)
     : gr::block(
         "decode",
         gr::io_signature::make(1, 1, sizeof(float)),
         gr::io_signature::make(0, 0, 0)),
-      state_(new state{})
+      state_(new state{tolerance})
 {
 }
 

@@ -4,7 +4,7 @@
   <key>ook_decode</key>
   <category>ook</category>
   <import>import ook</import>
-  <make>ook.decode()</make>
+  <make>ook.decode($tolerance)</make>
   <!-- Make one 'param' node for every Parameter you want settable from the GUI.
        Sub-nodes:
        * name
@@ -15,6 +15,12 @@
        * type
        * vlen
        * optional (set to 1 for optional inputs) -->
+  <param>
+    <name>Tolerance</name>
+    <key>tolerance</key>
+    <value>0.1</value>
+    <type>float</type>
+  </param>
   <sink>
     <name>in</name>
     <type>float</type>

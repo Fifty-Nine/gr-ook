@@ -34,7 +34,7 @@ class decode_impl : public decode
     state* state_;
 
   public:
-    decode_impl();
+    decode_impl(double tolerance = 0.1);
     ~decode_impl();
 
     // Where all the action really happens
