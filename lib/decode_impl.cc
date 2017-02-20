@@ -77,6 +77,15 @@ struct decode_impl::state : public util::coroutine {
     std::vector<char> packet_data;
     std::vector<char> packet_check;
 
+    virtual void on_reset() override
+    {
+        need_reset = false;
+        sync_count = 0;
+        detected_width = 0;
+        packet_data.clear();
+        packet_check.clear();
+    }
+
     bool hasNext() const
     {
         return data != endptr;
@@ -317,7 +326,6 @@ struct decode_impl::state : public util::coroutine {
         while (hasNext()) {
             coroutine::resume();
             if (need_reset) {
-                need_reset = false;
                 reset();
             }
         }
