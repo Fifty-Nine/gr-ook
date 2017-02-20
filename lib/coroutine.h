@@ -29,28 +29,44 @@ namespace ook
 {
 namespace util
 {
+/*
+ * Implements a simple coroutine API. Clients should inherit from this class
+ * and implement the body of the coroutine in the 'run()' method. The coroutine
+ * can be started (or resumed) by calling 'resume()'. The coroutine function can
+ * call 'yield()' to yield back to the calling context.
+ */
 class coroutine
 {
   private:
     struct coroutine_impl;
     std::unique_ptr<coroutine_impl> impl;
 
+    /* The body of the coroutine. */
     virtual void run() = 0;
-    virtual void on_exit()
-    {
-    }
-    virtual void on_reset()
-    {
-    }
 
+    /* Callback invoked when the coroutine exits. */
+    virtual void on_exit() {}
+    /* Callback invoked when the coroutine is reset. */
+    virtual void on_reset() {}
   public:
     coroutine();
     virtual ~coroutine();
 
+    /* Resume execution of the coroutine. */
     void resume();
 
-  protected:
+    /*
+     * Reset the coroutine. Execution will resume from the
+     * beginning of 'run()' and all local context will be
+     * discarded.
+     */
     void reset();
+
+  protected:
+    /*
+     * Pause execution of this coroutine and resume the
+     * calling context.
+     */
     void yield();
 };
 
