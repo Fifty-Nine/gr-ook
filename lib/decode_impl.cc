@@ -186,6 +186,21 @@ struct decode_impl::worker : public util::coroutine {
         return pmt::mp(os.str());
     }
 
+    pmt::pmt_t meta_packet(bool check_valid)
+    {
+        auto meta = pmt::make_dict();
+        meta = dict_add(
+            meta, pmt::mp("bit_count"), pmt::mp(packet_data.size())
+        );
+        meta = dict_add(
+            meta, pmt::mp("sync_count"), pmt::mp(sync_count)
+        );
+        meta = dict_add(
+            meta, pmt::mp("valid_check"), pmt::from_bool(check_valid)
+        );
+        return meta;
+    }
+
     void produce_packet()
     {
         bool check_valid = true;
@@ -221,19 +236,10 @@ struct decode_impl::worker : public util::coroutine {
         packet_queue.emplace_back(
             data_sym, pmt::init_u8vector(data.size(), data)
         );
-
-        auto meta = pmt::make_dict();
-        meta = dict_add(
-            meta, pmt::mp("bit_count"), pmt::mp(packet_data.size())
-        );
-        meta = dict_add(
-            meta, pmt::mp("sync_count"), pmt::mp(sync_count)
-        );
-        meta = dict_add(
-            meta, pmt::mp("valid_check"), pmt::from_bool(check_valid)
+        packet_queue.emplace_back(
+            meta_sym, meta_packet(check_valid)
         );
 
-        packet_queue.emplace_back(meta_sym, meta);
         if (debugEnabled(debug_flags::decode)) debug_print_packet();
     }
 
