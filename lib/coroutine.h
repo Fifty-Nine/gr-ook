@@ -36,7 +36,12 @@ class coroutine
     std::unique_ptr<coroutine_impl> impl;
 
     virtual void run() = 0;
-    virtual void on_exit() { }
+    virtual void on_exit()
+    {
+    }
+    virtual void on_reset()
+    {
+    }
 
   public:
     coroutine();

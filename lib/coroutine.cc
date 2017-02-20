@@ -58,6 +58,8 @@ struct coroutine::coroutine_impl {
         run_ctxt.uc_link = &return_ctxt;
 
         makecontext(&run_ctxt, (void (*)()) & run, 1, cr);
+
+        cr->on_reset();
     }
 
     static void fallthrough(coroutine* cr)
