@@ -57,7 +57,7 @@ struct packet_source_impl::impl : public util::coroutine {
         out++;
     }
 
-    void produceMany(int n, float value)
+    void produce_many(int n, float value)
     {
         for (int i = 0; i < n; ++i) {
             produce(value);
@@ -66,8 +66,8 @@ struct packet_source_impl::impl : public util::coroutine {
 
     void pulse(int hi, int lo)
     {
-        produceMany(hi, 1.0f);
-        produceMany(lo, 0.0f);
+        produce_many(hi, 1.0f);
+        produce_many(lo, 0.0f);
     }
 
     void pulse(int w)
@@ -77,7 +77,7 @@ struct packet_source_impl::impl : public util::coroutine {
 
     void blank()
     {
-        produceMany(10 * ms, 0.0f);
+        produce_many(10 * ms, 0.0f);
     }
 
     void sync()
@@ -89,15 +89,15 @@ struct packet_source_impl::impl : public util::coroutine {
 
     void preamble()
     {
-        produceMany(1 * ms, 0.0f);
-        produceMany(2 * ms, 1.0f);
-        produceMany(ms / 2, 0.0f);
+        produce_many(1 * ms, 0.0f);
+        produce_many(2 * ms, 1.0f);
+        produce_many(ms / 2, 0.0f);
     }
 
     void midamble()
     {
-        produceMany(1 * ms, 1.0f);
-        produceMany(1 * ms, 0.0f);
+        produce_many(1 * ms, 1.0f);
+        produce_many(1 * ms, 0.0f);
         preamble();
     }
 

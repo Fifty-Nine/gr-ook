@@ -90,14 +90,14 @@ struct decode_impl::state : public util::coroutine {
         packet_check.clear();
     }
 
-    bool hasNext() const
+    bool has_next() const
     {
         return data != endptr;
     }
 
-    float peekNext()
+    float peek_next()
     {
-        while (!hasNext()) {
+        while (!has_next()) {
             yield();
         }
         return *data;
@@ -105,7 +105,7 @@ struct decode_impl::state : public util::coroutine {
 
     float next()
     {
-        while (!hasNext()) {
+        while (!has_next()) {
             yield();
         }
 
@@ -381,12 +381,12 @@ struct decode_impl::state : public util::coroutine {
 
     void resume(const float* new_data, int size)
     {
-        assert(!hasNext());
+        assert(!has_next());
 
         data = new_data;
         endptr = data + size;
 
-        while (hasNext()) {
+        while (has_next()) {
             coroutine::resume();
             if (need_reset) {
                 reset();
@@ -394,12 +394,12 @@ struct decode_impl::state : public util::coroutine {
         }
     }
 
-    bool hasPacket()
+    bool has_packet()
     {
         return packet_queue.size();
     }
 
-    std::pair<pmt::pmt_t, pmt::pmt_t> nextPacket()
+    std::pair<pmt::pmt_t, pmt::pmt_t> next_packet()
     {
         auto result = packet_queue.front();
         packet_queue.pop_front();
@@ -449,8 +449,8 @@ int decode_impl::general_work(
 {
     state_->resume((const float*)input_items[0], ninput_items[0]);
 
-    while (state_->hasPacket()) {
-        auto packet = state_->nextPacket();
+    while (state_->has_packet()) {
+        auto packet = state_->next_packet();
         message_port_pub(packet.first, packet.second);
     }
 
