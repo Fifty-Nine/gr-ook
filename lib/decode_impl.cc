@@ -173,6 +173,19 @@ struct decode_impl::worker : public util::coroutine {
         }
     }
 
+    pmt::pmt_t pretty_packet(const std::vector<uint8_t> data, bool check_valid)
+    {
+        std::ostringstream os;
+        os << std::setfill('0');
+        os << std::setw(2) << sync_count << "S ";
+        os << std::setw(3) << packet_data.size() << "B ";
+        os << (check_valid ? "\u2713" : "\u2717");
+        for (auto c : data) {
+            os << " " << std::hex << std::setw(2) << (int)c;
+        }
+        return pmt::mp(os.str());
+    }
+
     void produce_packet()
     {
         bool check_valid = true;
@@ -202,25 +215,23 @@ struct decode_impl::worker : public util::coroutine {
             push_bit(0, byte, idx++, data);
         }
 
-        std::ostringstream os;
-        os << std::setfill('0');
-        os << std::setw(2) << sync_count << "S ";
-        os << std::setw(3) << packet_data.size() << "B ";
-        os << (int)check_valid << "C ";
-        for (auto c : data) {
-            os << std::hex << std::setw(2) << (int)c << " ";
-        }
-
-        packet_queue.emplace_back(pretty_sym, pmt::mp(os.str()));
         packet_queue.emplace_back(
-          data_sym, pmt::init_u8vector(data.size(), data));
+            pretty_sym, pretty_packet(data, check_valid)
+        );
+        packet_queue.emplace_back(
+            data_sym, pmt::init_u8vector(data.size(), data)
+        );
 
         auto meta = pmt::make_dict();
-        meta =
-          dict_add(meta, pmt::mp("bit_count"), pmt::mp(packet_data.size()));
-        meta = dict_add(meta, pmt::mp("sync_count"), pmt::mp(sync_count));
-        meta =
-          dict_add(meta, pmt::mp("valid_check"), pmt::from_bool(check_valid));
+        meta = dict_add(
+            meta, pmt::mp("bit_count"), pmt::mp(packet_data.size())
+        );
+        meta = dict_add(
+            meta, pmt::mp("sync_count"), pmt::mp(sync_count)
+        );
+        meta = dict_add(
+            meta, pmt::mp("valid_check"), pmt::from_bool(check_valid)
+        );
 
         packet_queue.emplace_back(meta_sym, meta);
         if (debugEnabled(debug_flags::decode)) debug_print_packet();
