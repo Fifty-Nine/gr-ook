@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /*
- * Copyright 2017 <+YOU OR YOUR COMPANY+>.
+ * Copyright 2017 Tim Prince.
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,13 +77,13 @@ struct packet_source_impl::worker : public util::coroutine {
 
     void blank()
     {
-        produce_many(10 * ms, 0.0f);
+        produce_many(5 * ms, 0.0f);
     }
 
     void sync()
     {
-        for (int i = 0; i < 10; ++i) {
-            pulse(1 * ms);
+        for (int i = 0; i < 40; ++i) {
+            pulse(1.0f * ms);
         }
     }
 
@@ -98,36 +98,44 @@ struct packet_source_impl::worker : public util::coroutine {
     {
         produce_many(1 * ms, 1.0f);
         produce_many(1 * ms, 0.0f);
+        produce_many(1 * ms, 1.0f);
+        produce_many(1 * ms, 0.0f);
         preamble();
     }
 
     void postamble()
     {
         pulse(1 * ms);
+        pulse(1 * ms);
     }
 
-    void zero()
+    static float value(int idx)
     {
-        pulse(ms / 2, 1 * ms);
+        return (idx & 1) ? 0.0f : 1.0f;
     }
 
-    void one()
+    void zero(int idx)
     {
-        pulse(1 * ms, ms / 2);
+        produce_many(ms / 2, value(idx));
     }
 
-    void bit(bool v)
+    void one(int idx)
+    {
+        produce_many(1 * ms, value(idx));
+    }
+
+    void bit(bool v, int idx)
     {
         if (v)
-            one();
+            one(idx);
         else
-            zero();
+            zero(idx);
     }
 
     void data(int c)
     {
         for (int i = 0; i < 4; ++i) {
-            bit((c >> (3 - i)) & 1);
+            bit((c >> (3 - i)) & 1, i);
         }
     }
 
