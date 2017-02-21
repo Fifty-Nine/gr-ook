@@ -310,11 +310,10 @@ struct decode_impl::worker : public util::coroutine {
         while (true) {
             int hi = count_until(&is_low, timeout);
 
-            bool logic_val;
             if (within_range(hi, one_width, tolerance)) {
-                logic_val = true;
+                out.push_back(true);
             } else if (within_range(hi, zero_width, tolerance)) {
-                logic_val = false;
+                out.push_back(false);
             } else {
                 debug(
                   debug_flags::decode,
@@ -340,8 +339,10 @@ struct decode_impl::worker : public util::coroutine {
             } else if (lo > end_width) {
                 out.pop_back();
                 return;
-            } else if (within_range(lo, zero_width, tolerance)) {
             } else if (within_range(lo, one_width, tolerance)) {
+                out.push_back(true);
+            } else if (within_range(lo, zero_width, tolerance)) {
+                out.push_back(false);
             } else {
                 debug(
                   debug_flags::decode,
@@ -357,8 +358,6 @@ struct decode_impl::worker : public util::coroutine {
                   out.size());
                 return;
             }
-
-            out.push_back(logic_val);
 
             if (out.size() > 1024) {
                 debug(debug_flags::decode, "Exceeded packet bit limit");
