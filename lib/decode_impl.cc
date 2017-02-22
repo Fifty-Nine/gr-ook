@@ -64,6 +64,12 @@ struct bad_transition_error : public std::runtime_error {
         std::runtime_error("signal did not transition when expected")
     { }
 };
+
+struct bad_midamble_error : public std::runtime_error {
+    bad_midamble_error() :
+        std::runtime_error("bad midamble")
+    { }
+};
 }
 
 struct decode_impl::worker : public util::coroutine {
@@ -346,35 +352,34 @@ struct decode_impl::worker : public util::coroutine {
     void receive_data(std::vector<bool>& out)
     {
         while (true) {
-            int hi = receive_bit(&is_low, out);
+            int lo = receive_bit(&is_high, out);
 
-            if (hi != 0) {
+            if (within_range(lo, timing.preamble, tolerance)) {
+                /* start of a mid-amble */
+                if (!within_range(count_until(&is_low), timing.preamble, tolerance)) {
+                    throw bad_midamble_error { };
+                }
+            } else if (lo > timing.end) {
+                return;
+            } else if (lo != 0) {
                 debug(
                   debug_flags::decode,
-                  "Signal did not go low when expected.\n");
+                  "Signal did not go high when expected.\n");
                 debug(
                   debug_flags::decode,
-                  "hi(%d) one(%d) zero(%d) bit(%d)\n",
-                  hi,
+                  "lo(%d) one(%d) zero(%d) bit(%d)\n",
+                  lo,
                   (int)timing.one,
                   (int)timing.zero,
                   out.size());
                 return;
             }
 
-            int lo = receive_bit(&is_high, out);
-
-            if (within_range(lo, timing.preamble, tolerance)) {
-                /* start of a mid-amble */
-                out.pop_back();
-                wait_until(&is_low);
-                wait_until(&is_high);
-            } else if (lo > timing.end) {
-                out.pop_back();
-            } else if (lo != 0) {
+            int hi = receive_bit(&is_low, out);
+            if (hi != 0) {
                 debug(
                   debug_flags::decode,
-                  "Signal did not go high when expected.\n");
+                  "Signal did not go low when expected.\n");
                 debug(
                   debug_flags::decode,
                   "hi(%d) lo(%d) one(%d) zero(%d) preamb(%d) bit(%d)\n",
@@ -416,14 +421,12 @@ struct decode_impl::worker : public util::coroutine {
               timing.preamble);
         }
 
-        wait_until(&is_high);
-
         debug(debug_flags::decode, "begin receive data\n");
         receive_data(packet_data);
         debug(debug_flags::decode, "begin receive check\n");
         receive_data(packet_check);
 
-        if (packet_data.size() > 0) {
+        if (packet_data.size() > 0 && packet_check.size() > 0) {
             produce_packet();
         }
     }

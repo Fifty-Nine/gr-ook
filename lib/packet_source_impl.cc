@@ -85,33 +85,27 @@ struct packet_source_impl::worker : public util::coroutine {
         for (int i = 0; i < 40; ++i) {
             pulse(1.0f * ms);
         }
+        produce_many(1.0 * ms, 1.0f);
     }
 
     void preamble()
     {
-        produce_many(1 * ms, 0.0f);
+        produce_many(2 * ms, 0.0f);
         produce_many(2 * ms, 1.0f);
-        produce_many(ms / 2, 0.0f);
     }
 
     void midamble()
     {
-        produce_many(1 * ms, 1.0f);
-        produce_many(1 * ms, 0.0f);
-        produce_many(1 * ms, 1.0f);
-        produce_many(1 * ms, 0.0f);
         preamble();
     }
 
     void postamble()
     {
-        pulse(1 * ms);
-        pulse(1 * ms);
     }
 
     static float value(int idx)
     {
-        return (idx & 1) ? 0.0f : 1.0f;
+        return (idx & 1) ? 1.0f : 0.0f;
     }
 
     void zero(int idx)
