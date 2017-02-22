@@ -389,7 +389,9 @@ struct decode_impl::worker : public util::coroutine {
         debug(debug_flags::decode, "begin receive check\n");
         receive_data(packet_check);
 
-        produce_packet();
+        if (packet_data.size() > 0) {
+            produce_packet();
+        }
     }
 
     void resume(const float* new_data, int size)
