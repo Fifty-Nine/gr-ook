@@ -72,20 +72,39 @@ struct decode_impl::worker : public util::coroutine {
     const float* endptr = nullptr;
 
     int sync_count = 0;
-    int detected_width = 0;
     std::vector<char> packet_data;
     std::vector<char> packet_check;
 
     pmt::pmt_t packet_sym = pmt::mp("packet");
     std::deque<pmt::pmt_t> packet_queue;
 
+    struct timing_params {
+        timing_params() :
+            one(0),
+            zero(0),
+            preamble(0),
+            end(0),
+            timeout(-1)
+        { }
+
+        timing_params(int width) :
+            one(width),
+            zero(width / 2),
+            preamble(width * 2),
+            end(width * 4),
+            timeout(width * 8)
+        { }
+
+        int one, zero, preamble, end, timeout;
+    } timing;
+
     virtual void on_reset() override
     {
         need_reset = false;
         sync_count = 0;
-        detected_width = 0;
         packet_data.clear();
         packet_check.clear();
+        timing = { };
     }
 
     bool has_next() const
@@ -122,7 +141,7 @@ struct decode_impl::worker : public util::coroutine {
         return f < 0.5;
     }
 
-    int count_until(bool (*fn)(float), int max = -1)
+    int count_until(bool (*fn)(float), int max)
     {
         int count = 0;
         while (!fn(next()) && (max == -1 || count < max)) {
@@ -133,10 +152,19 @@ struct decode_impl::worker : public util::coroutine {
         }
         return count;
     }
+    int count_until(bool (*fn)(float))
+    {
+        return count_until(fn, timing.timeout);
+    }
 
-    void wait_until(bool (*fn)(float), int max = -1)
+    void wait_until(bool (*fn)(float), int max)
     {
         (void)count_until(fn, max);
+    }
+
+    void wait_until(bool (*fn)(float))
+    {
+        wait_until(fn, timing.timeout);
     }
 
     std::string phy_pretty_packet()
@@ -257,7 +285,7 @@ struct decode_impl::worker : public util::coroutine {
 
     bool detect_sync_width()
     {
-        detected_width = 0;
+        int detected_width = 0;
         int wait_time = -1;
         while (true) {
             int hi_count = count_until(&is_low, wait_time);
@@ -266,6 +294,7 @@ struct decode_impl::worker : public util::coroutine {
             if (detected_width > 1 && lo_count > (1.7 * detected_width)) {
                 debug(
                   debug_flags::decode, "detected sync %d\n:", detected_width);
+                timing = timing_params { detected_width };
                 return true;
             }
 
@@ -291,18 +320,12 @@ struct decode_impl::worker : public util::coroutine {
 
     void receive_data(std::vector<char>& out)
     {
-        const int one_width = detected_width;
-        const int zero_width = detected_width / 2;
-        const int preamb_width = detected_width * 2;
-        const int end_width = detected_width * 4;
-        const int timeout = end_width * 2;
-
         while (true) {
-            int hi = count_until(&is_low, timeout);
+            int hi = count_until(&is_low);
 
-            if (within_range(hi, one_width, tolerance)) {
+            if (within_range(hi, timing.one, tolerance)) {
                 out.push_back(true);
-            } else if (within_range(hi, zero_width, tolerance)) {
+            } else if (within_range(hi, timing.zero, tolerance)) {
                 out.push_back(false);
             } else {
                 debug(
@@ -312,26 +335,26 @@ struct decode_impl::worker : public util::coroutine {
                   debug_flags::decode,
                   "hi(%d) one(%d) zero(%d) bit(%d)\n",
                   hi,
-                  (int)one_width,
-                  (int)zero_width,
+                  (int)timing.one,
+                  (int)timing.zero,
                   out.size());
                 return;
             }
 
-            int lo = count_until(&is_high, timeout);
+            int lo = count_until(&is_high);
 
-            if (within_range(lo, preamb_width, tolerance)) {
+            if (within_range(lo, timing.preamble, tolerance)) {
                 /* start of a mid-amble */
                 out.pop_back();
-                wait_until(&is_low, timeout);
-                wait_until(&is_high, timeout);
+                wait_until(&is_low);
+                wait_until(&is_high);
                 return;
-            } else if (lo > end_width) {
+            } else if (lo > timing.end) {
                 out.pop_back();
                 return;
-            } else if (within_range(lo, one_width, tolerance)) {
+            } else if (within_range(lo, timing.one, tolerance)) {
                 out.push_back(true);
-            } else if (within_range(lo, zero_width, tolerance)) {
+            } else if (within_range(lo, timing.zero, tolerance)) {
                 out.push_back(false);
             } else {
                 debug(
@@ -342,9 +365,9 @@ struct decode_impl::worker : public util::coroutine {
                   "hi(%d) lo(%d) one(%d) zero(%d) preamb(%d) bit(%d)\n",
                   hi,
                   lo,
-                  (int)one_width,
-                  (int)zero_width,
-                  (int)preamb_width,
+                  (int)timing.one,
+                  (int)timing.zero,
+                  (int)timing.preamble,
                   out.size());
                 return;
             }
@@ -364,25 +387,23 @@ struct decode_impl::worker : public util::coroutine {
             return;
         }
 
-        int timeout = 4 * detected_width;
-
-        int preamble_size = count_until(is_low, timeout);
-        if (!within_range(preamble_size, 2.0 * detected_width, tolerance)) {
+        int preamble_size = count_until(is_low);
+        if (!within_range(preamble_size, timing.preamble, tolerance)) {
             debug(
               debug_flags::decode,
               "Bad preamble: %d != %d\n",
               preamble_size,
-              2 * detected_width);
+              timing.preamble);
             return;
         } else {
             debug(
               debug_flags::decode,
               "preamble: actual(%d) expected(%d)\n",
               preamble_size,
-              2 * detected_width);
+              timing.preamble);
         }
 
-        wait_until(&is_high, timeout);
+        wait_until(&is_high);
 
         debug(debug_flags::decode, "begin receive data\n");
         receive_data(packet_data);
