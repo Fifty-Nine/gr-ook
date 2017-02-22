@@ -48,15 +48,21 @@ bool within_range(double act, double exp, double tolerance)
 }
 
 struct timeout_error : public std::runtime_error {
-    timeout_error() : std::runtime_error("timeout reading data")
-    {
-    }
+    timeout_error() :
+        std::runtime_error("timeout reading data")
+    { }
 };
 
 struct too_many_bits_error : public std::runtime_error {
-    too_many_bits_error() : std::runtime_error("exceeded max allowed data bits")
-    {
-    }
+    too_many_bits_error() :
+        std::runtime_error("exceeded max allowed data bits")
+    { }
+};
+
+struct bad_transition_error : public std::runtime_error {
+    bad_transition_error() :
+        std::runtime_error("signal did not transition when expected")
+    { }
 };
 }
 
@@ -72,8 +78,8 @@ struct decode_impl::worker : public util::coroutine {
     const float* endptr = nullptr;
 
     int sync_count = 0;
-    std::vector<char> packet_data;
-    std::vector<char> packet_check;
+    std::vector<bool> packet_data;
+    std::vector<bool> packet_check;
 
     pmt::pmt_t packet_sym = pmt::mp("packet");
     std::deque<pmt::pmt_t> packet_queue;
@@ -318,16 +324,31 @@ struct decode_impl::worker : public util::coroutine {
         }
     }
 
-    void receive_data(std::vector<char>& out)
+    int receive_bit(bool (*fn)(float), std::vector<bool>& out)
+    {
+        if (out.size() > 1024) {
+            debug(debug_flags::decode, "Exceeded packet bit limit");
+            throw too_many_bits_error{};
+        }
+
+        int count = count_until(fn);
+        if (within_range(count, timing.one, tolerance)) {
+            out.push_back(true);
+            return 0;
+        } else if (within_range(count, timing.zero, tolerance)) {
+            out.push_back(false);
+            return 0;
+        }
+
+        return count;
+    }
+
+    void receive_data(std::vector<bool>& out)
     {
         while (true) {
-            int hi = count_until(&is_low);
+            int hi = receive_bit(&is_low, out);
 
-            if (within_range(hi, timing.one, tolerance)) {
-                out.push_back(true);
-            } else if (within_range(hi, timing.zero, tolerance)) {
-                out.push_back(false);
-            } else {
+            if (hi != 0) {
                 debug(
                   debug_flags::decode,
                   "Signal did not go low when expected.\n");
@@ -341,22 +362,16 @@ struct decode_impl::worker : public util::coroutine {
                 return;
             }
 
-            int lo = count_until(&is_high);
+            int lo = receive_bit(&is_high, out);
 
             if (within_range(lo, timing.preamble, tolerance)) {
                 /* start of a mid-amble */
                 out.pop_back();
                 wait_until(&is_low);
                 wait_until(&is_high);
-                return;
             } else if (lo > timing.end) {
                 out.pop_back();
-                return;
-            } else if (within_range(lo, timing.one, tolerance)) {
-                out.push_back(true);
-            } else if (within_range(lo, timing.zero, tolerance)) {
-                out.push_back(false);
-            } else {
+            } else if (lo != 0) {
                 debug(
                   debug_flags::decode,
                   "Signal did not go high when expected.\n");
@@ -369,12 +384,10 @@ struct decode_impl::worker : public util::coroutine {
                   (int)timing.zero,
                   (int)timing.preamble,
                   out.size());
-                return;
             }
 
-            if (out.size() > 1024) {
-                debug(debug_flags::decode, "Exceeded packet bit limit");
-                throw too_many_bits_error{};
+            if (lo != 0) {
+                return;
             }
         }
     }
