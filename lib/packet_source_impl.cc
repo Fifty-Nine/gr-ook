@@ -77,7 +77,7 @@ struct packet_source_impl::worker : public util::coroutine {
 
     void blank()
     {
-        produce_many(5 * ms, 0.0f);
+        produce_many(10 * ms, 0.0f);
     }
 
     void sync()
