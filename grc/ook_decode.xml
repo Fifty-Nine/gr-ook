@@ -26,17 +26,7 @@
     <type>float</type>
   </sink>
   <source>
-    <name>packet_data</name>
-    <type>message</type>
-    <optional>1</optional>
-  </source>
-  <source>
-    <name>packet_pretty</name>
-    <type>message</type>
-    <optional>1</optional>
-  </source>
-  <source>
-    <name>packet_meta</name>
+    <name>packet</name>
     <type>message</type>
     <optional>1</optional>
   </source>

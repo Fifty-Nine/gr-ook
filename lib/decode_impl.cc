@@ -76,11 +76,8 @@ struct decode_impl::worker : public util::coroutine {
     std::vector<char> packet_data;
     std::vector<char> packet_check;
 
-    pmt::pmt_t data_sym = pmt::mp("packet_data");
-    pmt::pmt_t pretty_sym = pmt::mp("packet_pretty");
-    pmt::pmt_t meta_sym = pmt::mp("packet_meta");
-    pmt::pmt_t phy_pretty_sym = pmt::mp("phy_packet_pretty");
-    std::deque<std::pair<pmt::pmt_t, pmt::pmt_t>> packet_queue;
+    pmt::pmt_t packet_sym = pmt::mp("packet");
+    std::deque<pmt::pmt_t> packet_queue;
 
     virtual void on_reset() override
     {
@@ -178,21 +175,6 @@ struct decode_impl::worker : public util::coroutine {
         return pmt::mp(os.str());
     }
 
-    pmt::pmt_t meta_packet(bool check_valid)
-    {
-        auto meta = pmt::make_dict();
-        meta = dict_add(
-            meta, pmt::mp("bit_count"), pmt::mp(packet_data.size())
-        );
-        meta = dict_add(
-            meta, pmt::mp("sync_count"), pmt::mp(sync_count)
-        );
-        meta = dict_add(
-            meta, pmt::mp("valid_check"), pmt::from_bool(check_valid)
-        );
-        return meta;
-    }
-
     void push_bit(bool bit, uint8_t& c, size_t idx, std::vector<uint8_t>& out)
     {
         c <<= 1;
@@ -232,22 +214,30 @@ struct decode_impl::worker : public util::coroutine {
             push_bit(0, byte, idx++, data);
         }
 
-        packet_queue.emplace_back(
-            pretty_sym, pretty_packet(data, check_valid)
-        );
-        packet_queue.emplace_back(
-            data_sym, pmt::init_u8vector(data.size(), data)
-        );
-        packet_queue.emplace_back(
-            meta_sym, meta_packet(check_valid)
-        );
-
         auto phy_packet = phy_pretty_packet();
         debug(debug_flags::decode, "phy: %s\n", phy_packet.c_str());
 
-        packet_queue.emplace_back(
-            phy_pretty_sym, pmt::mp(phy_packet)
+        auto packet = pmt::make_dict();
+        packet = dict_add(
+            packet, pmt::mp("data"), pmt::init_u8vector(data.size(), data)
         );
+        packet = dict_add(
+            packet, pmt::mp("pretty"), pretty_packet(data, check_valid)
+        );
+        packet = dict_add(
+            packet, pmt::mp("phy_pretty"), pmt::mp(phy_packet)
+        );
+        packet = dict_add(
+            packet, pmt::mp("bit_count"), pmt::mp(packet_data.size())
+        );
+        packet = dict_add(
+            packet, pmt::mp("sync_count"), pmt::mp(sync_count)
+        );
+        packet = dict_add(
+            packet, pmt::mp("valid_check"), pmt::from_bool(check_valid)
+        );
+
+        packet_queue.push_back(packet);
     }
 
     virtual void run() override
@@ -422,7 +412,7 @@ struct decode_impl::worker : public util::coroutine {
         return packet_queue.size();
     }
 
-    std::pair<pmt::pmt_t, pmt::pmt_t> next_packet()
+    pmt::pmt_t next_packet()
     {
         auto result = packet_queue.front();
         packet_queue.pop_front();
@@ -445,10 +435,7 @@ decode_impl::decode_impl(double tolerance)
         gr::io_signature::make(0, 0, 0)),
       worker_(new worker{tolerance})
 {
-    message_port_register_out(worker_->data_sym);
-    message_port_register_out(worker_->pretty_sym);
-    message_port_register_out(worker_->phy_pretty_sym);
-    message_port_register_out(worker_->meta_sym);
+    message_port_register_out(worker_->packet_sym);
 }
 
 /*
@@ -474,7 +461,7 @@ int decode_impl::general_work(
 
     while (worker_->has_packet()) {
         auto packet = worker_->next_packet();
-        message_port_pub(packet.first, packet.second);
+        message_port_pub(worker_->packet_sym, packet);
     }
 
     // Tell runtime system how many input items we consumed on
