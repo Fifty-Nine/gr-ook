@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # 
-# Copyright 2017 <+YOU OR YOUR COMPANY+>.
+# Copyright 2017 Tim Prince
 # 
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,19 @@ import ook_swig as ook
 import os, sys, fnmatch
 from fnmatch import fnmatch
 import pmt
+import json
+import unittest
+
+samples_dir = os.environ['OOK_TEST_SAMPLES_DIR']
+
+def de_unicode(x):
+  if isinstance(x, unicode):
+    return x.encode('utf-8')
+  if isinstance(x, list):
+    return [de_unicode(y) for y in x]
+  if isinstance(x, dict):
+    return {de_unicode(k) : de_unicode(v) for k, v in x.iteritems()}
+  return x
 
 class qa_decode (gr_unittest.TestCase):
 
@@ -36,37 +49,47 @@ class qa_decode (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def _run_test (self, src_block):
-      decode = ook.decode(0.25)
+    def _run_test (self, src_block, tolerance):
+      decode = ook.decode(tolerance)
       out = blocks.message_debug()
       self.tb.connect(src_block, decode)
       self.tb.msg_connect(decode, "packet", out, "store")
       self.tb.run()
 
+      result = []
       for i in range(out.num_messages()):
-        print out.get_message(i)
+        packet = pmt.to_python(out.get_message(i))
+        packet['data'] = packet['data'].tolist()
+        result.append(packet)
+
+      return result
 
     def _data_test (self, data):
-      self._run_test(ook.packet_source(data))
+      packets = self._run_test(ook.packet_source(data), tolerance=0.1)
+      self.assertEqual(len(packets), 1)
+      self.assertEqual(packets[0]['data'], data)
+      self.assertEqual(packets[0]['valid_check'], True)
+      self.assertEqual(packets[0]['bit_count'], 8 * len(data))
 
-    def _file_test (self, filename):
-      print "Testing {0}".format(filename)
+    def _file_test (self, test_spec):
       src = blocks.file_source(
           gr.sizeof_float * 1,
-          filename,
+          str(os.path.join(samples_dir, test_spec['name'])),
           False
       )
-      self._run_test(src)
+      packets = self._run_test(src, test_spec['tolerance'])
+      self.assertEqual(packets, test_spec['packets'])
 
     def test_samples (self):
-      print "Test samples"
-      samples_dir = os.environ["OOK_TEST_SAMPLES_DIR"]
-      files = [f for f in os.listdir(samples_dir) if fnmatch(f, '*.f32')]
-      for f in files:
-        self._file_test(os.path.join(samples_dir, f))
+      tests = json.load(
+        open(os.path.join(samples_dir, 'decode-tests.json')),
+        object_hook=de_unicode
+      )
+
+      for test_spec in tests:
+        self._file_test(test_spec)
 
     def test_random (self):
-      print "Test random"
       src = blocks.file_source(
           gr.sizeof_float * 1,
           "/dev/urandom",
@@ -80,17 +103,13 @@ class qa_decode (gr_unittest.TestCase):
       self.tb.stop()
       self.tb.wait()
 
+    @unittest.expectedFailure
     def test_patterns (self):
-      print "Test 0s"
-      self._data_test([0x0] * 11)
-      print "Test 1s"
-      self._data_test([0xf] * 11)
-      print "Test 01s"
-      self._data_test([0x5] * 11)
-      print "Test 10s"
-      self._data_test([0xA] * 11)
-      print "Test counter"
-      self._data_test([0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB])
+      self._data_test([0x00] * 5)
+      self._data_test([0xff] * 5)
+      self._data_test([0x55] * 5)
+      self._data_test([0xAA] * 5)
+      self._data_test([0x12, 0x34, 0x56, 0x78, 0x9A])
 
 
 if __name__ == '__main__':
