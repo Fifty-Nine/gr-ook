@@ -153,5 +153,10 @@
     ],
     "tolerance": 0.25,
     "name": "keypad_5555.f32"
+  },
+  {
+    "packets": [],
+    "tolerance": 0.25,
+    "name": "zero_bits.f32"
   }
 ]
