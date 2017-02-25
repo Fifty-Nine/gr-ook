@@ -66,8 +66,7 @@ class qa_decode (gr_unittest.TestCase):
       return result
 
     def _data_test (self, data):
-      nibbles = list(chain(*[(x >> 4, x & 0xf) for x in data]))
-      packets = self._run_test(ook.packet_source(nibbles), tolerance=0.1)
+      packets = self._run_test(ook.packet_source(data), tolerance=0.1)
       self.assertEqual(len(packets), 1)
       self.assertEqual(packets[0]['data'], data)
       self.assertEqual(packets[0]['valid_check'], True)

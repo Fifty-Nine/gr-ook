@@ -47,7 +47,7 @@ namespace gr {
        * creating new instances.
        */
       static sptr make(
-        const std::vector<char> &data,
+        const std::vector<int> &data,
         int stop_after = 1,
         int ms_between_xmit = 10,
         int sample_rate = 32000

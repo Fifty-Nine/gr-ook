@@ -36,7 +36,7 @@ class packet_source_impl : public packet_source
 
   public:
     packet_source_impl(
-        const std::vector<char>& nibbles,
+        const std::vector<int>& nibbles,
         int stop_after = 1,
         int ms_between_xmit = 10,
         int sample_rate = 32000);

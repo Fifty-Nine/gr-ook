@@ -28,12 +28,15 @@
 
 #include "coroutine.h"
 
+namespace {
+const pmt::pmt_t packet_sym = pmt::mp("packets");
+}
+
 namespace gr
 {
 namespace ook
 {
 struct packet_source_impl::worker : public util::coroutine {
-    std::vector<char> in;
     int stop_after;
     int ms_between_xmit;
     const int ms;
@@ -41,18 +44,22 @@ struct packet_source_impl::worker : public util::coroutine {
     float* out;
     float* endptr;
 
+    std::deque<std::vector<int>> packet_queue;
+
     worker(
-        const std::vector<char>& init_data,
+        std::vector<int> init_data,
         int stop_after,
         int ms_between_xmit,
         int sample_rate) :
-        in(init_data.begin(), init_data.end()),
         stop_after(stop_after),
         ms_between_xmit(ms_between_xmit),
         ms(sample_rate / 1000),
         out(nullptr),
         endptr(nullptr)
     {
+        if (!init_data.empty()) {
+            packet_queue.push_back(init_data);
+        }
     }
 
     void produce(float value)
@@ -136,31 +143,45 @@ struct packet_source_impl::worker : public util::coroutine {
 
     void data(int c)
     {
-        for (int i = 0; i < 4; ++i) {
-            bit((c >> (3 - i)) & 1, i);
+        for (int i = 0; i < 8; ++i) {
+            bit((c >> (7 - i)) & 1, i);
         }
     }
 
-    void data()
+    void data(const std::vector<int>& packet)
     {
-        for (int c : in) {
+        for (int c : packet) {
             data(c);
         }
     }
 
-    void run()
+    void enqueue(pmt::pmt_t packet)
+    {
+        packet_queue.push_back(s32vector_elements(packet));
+    }
+
+    void send_packet(const std::vector<int>& packet)
     {
         blank();
         sync();
         preamble();
-        data();
+        data(packet);
         midamble();
-        data();
+        data(packet);
         postamble();
+        blank(ms_between_xmit);
         stop_after = std::max(-1, stop_after - 1);
+    }
 
-        /* Always blank for 10 ms after the final packet. */
-        blank((stop_after == 0) ? 10 : ms_between_xmit);
+    void run()
+    {
+        while (stop_after) {
+            while (packet_queue.empty()) {
+                blank();
+            }
+            send_packet(packet_queue.front());
+            packet_queue.pop_front();
+        }
     }
 
     int resume(float* data, int size)
@@ -178,7 +199,7 @@ struct packet_source_impl::worker : public util::coroutine {
 };
 
 packet_source::sptr packet_source::make(
-  const std::vector<char>& data,
+  const std::vector<int>& data,
   int stop_after,
   int ms_between_xmit,
   int sample_rate)
@@ -197,22 +218,26 @@ packet_source::sptr packet_source::make(
  * The private constructor
  */
 packet_source_impl::packet_source_impl(
-  const std::vector<char>& data,
+  const std::vector<int>& data,
   int stop_after,
   int ms_between_xmit,
-  int sample_rate)
-    : gr::sync_block(
+  int sample_rate) :
+    gr::sync_block(
         "packet_source",
         gr::io_signature::make(0, 0, 0),
         gr::io_signature::make(1, 1, sizeof(float))
-      ),
-      worker_(new worker {
+    ),
+    worker_(
+        new worker {
             data,
             stop_after,
             ms_between_xmit,
             sample_rate
-      })
+        }
+    )
 {
+    message_port_register_in(packet_sym);
+    set_msg_handler(packet_sym, [this](pmt::pmt_t p) { worker_->enqueue(p); });
 }
 
 /*
