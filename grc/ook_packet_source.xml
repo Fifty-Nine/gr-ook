@@ -6,9 +6,19 @@
   <import>import ook</import>
   <make>ook.packet_source($data, $sample_rate)</make>
   <param>
-    <name>Packet Data</name>
+    <name>Initial Packet Data</name>
     <key>data</key>
     <type>int_vector</type>
+  </param>
+  <param>
+   <name>Stop After</name>
+   <key>stop_after</key>
+   <type>int</type>
+  </param>
+  <param>
+   <name>Milliseconds between transmissions</name>
+   <key>ms_between_xmit</key>
+   <type>int</type>
   </param>
   <param>
     <name>Sample Rate</name>

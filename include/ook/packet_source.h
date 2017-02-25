@@ -46,7 +46,12 @@ namespace gr {
        * class. ook::packet_source::make is the public interface for
        * creating new instances.
        */
-      static sptr make(const std::vector<char> &data, int sample_rate = 32000);
+      static sptr make(
+        const std::vector<char> &data,
+        int stop_after = 1,
+        int ms_between_xmit = 10,
+        int sample_rate = 32000
+      );
     };
 
   } // namespace ook

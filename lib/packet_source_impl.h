@@ -35,7 +35,11 @@ class packet_source_impl : public packet_source
     std::unique_ptr<worker> worker_;
 
   public:
-    packet_source_impl(const std::vector<char>& nibbles, int sample_rate = 32000);
+    packet_source_impl(
+        const std::vector<char>& nibbles,
+        int stop_after = 1,
+        int ms_between_xmit = 10,
+        int sample_rate = 32000);
     ~packet_source_impl();
 
     // Where all the action really happens

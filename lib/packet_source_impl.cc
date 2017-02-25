@@ -34,16 +34,24 @@ namespace ook
 {
 struct packet_source_impl::worker : public util::coroutine {
     std::vector<char> in;
+    int stop_after;
+    int ms_between_xmit;
     const int ms;
 
     float* out;
     float* endptr;
 
-    worker(const std::vector<char>& init_data, int sample_rate)
-        : in(init_data.begin(), init_data.end()),
-          ms(sample_rate / 1000),
-          out(nullptr),
-          endptr(nullptr)
+    worker(
+        const std::vector<char>& init_data,
+        int stop_after,
+        int ms_between_xmit,
+        int sample_rate) :
+        in(init_data.begin(), init_data.end()),
+        stop_after(stop_after),
+        ms_between_xmit(ms_between_xmit),
+        ms(sample_rate / 1000),
+        out(nullptr),
+        endptr(nullptr)
     {
     }
 
@@ -75,9 +83,9 @@ struct packet_source_impl::worker : public util::coroutine {
         pulse(w, w);
     }
 
-    void blank()
+    void blank(int time = 10)
     {
-        produce_many(10 * ms, 0.0f);
+        produce_many(time * ms, 0.0f);
     }
 
     void sync()
@@ -149,11 +157,18 @@ struct packet_source_impl::worker : public util::coroutine {
         midamble();
         data();
         postamble();
-        blank();
+        stop_after = std::max(-1, stop_after - 1);
+
+        /* Always blank for 10 ms after the final packet. */
+        blank((stop_after == 0) ? 10 : ms_between_xmit);
     }
 
     int resume(float* data, int size)
     {
+        if (stop_after == 0) {
+            return 0;
+        }
+
         out = data;
         endptr = data + size;
         coroutine::resume();
@@ -164,10 +179,18 @@ struct packet_source_impl::worker : public util::coroutine {
 
 packet_source::sptr packet_source::make(
   const std::vector<char>& data,
+  int stop_after,
+  int ms_between_xmit,
   int sample_rate)
 {
     return gnuradio::get_initial_sptr(
-      new packet_source_impl{data, sample_rate});
+      new packet_source_impl {
+        data,
+        stop_after,
+        ms_between_xmit,
+        sample_rate
+      }
+    );
 }
 
 /*
@@ -175,12 +198,20 @@ packet_source::sptr packet_source::make(
  */
 packet_source_impl::packet_source_impl(
   const std::vector<char>& data,
+  int stop_after,
+  int ms_between_xmit,
   int sample_rate)
     : gr::sync_block(
         "packet_source",
         gr::io_signature::make(0, 0, 0),
-        gr::io_signature::make(1, 1, sizeof(float))),
-      worker_(new worker{data, sample_rate})
+        gr::io_signature::make(1, 1, sizeof(float))
+      ),
+      worker_(new worker {
+            data,
+            stop_after,
+            ms_between_xmit,
+            sample_rate
+      })
 {
 }
 
