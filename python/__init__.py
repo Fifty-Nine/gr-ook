@@ -1,3 +1,4 @@
+
 #
 # Copyright 2008,2009 Free Software Foundation, Inc.
 #
@@ -19,17 +20,17 @@
 # The presence of this file turns this directory into a Python package
 
 '''
-This is the GNU Radio OOK module. Place your Python package
+This is the GNU Radio SMARTNET module. Place your Python package
 description here (python/__init__.py).
 '''
+from __future__ import unicode_literals
 
-# import swig generated symbols into the ook namespace
+# import swig generated symbols into the smartnet namespace
 try:
-	# this might fail if the module is python-only
-	from ook_swig import *
+    # this might fail if the module is python-only
+    from .smartnet_swig import *
 except ImportError:
-	pass
+    pass
 
 # import any pure python here
-
 #

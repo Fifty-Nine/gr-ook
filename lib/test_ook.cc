@@ -32,6 +32,16 @@
 #include <iostream>
 #include <fstream>
 
+#include "qa_ook.h"
+
+CppUnit::TestSuite *
+qa_ook::suite()
+{
+  CppUnit::TestSuite *s = new CppUnit::TestSuite("ook");
+
+  return s;
+}
+
 int
 main (int argc, char **argv)
 {

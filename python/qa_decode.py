@@ -34,12 +34,12 @@ from itertools import chain
 samples_dir = os.environ['OOK_TEST_SAMPLES_DIR']
 
 def de_unicode(x):
-  if isinstance(x, unicode):
-    return x.encode('utf-8')
+#  if isinstance(x, unicode):
+#    return x.encode('utf-8')
   if isinstance(x, list):
     return [de_unicode(y) for y in x]
   if isinstance(x, dict):
-    return {de_unicode(k) : de_unicode(v) for k, v in x.iteritems()}
+    return {de_unicode(k) : de_unicode(v) for k, v in x.items()}
   return x
 
 class qa_decode (gr_unittest.TestCase):

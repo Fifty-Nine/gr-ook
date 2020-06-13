@@ -21,8 +21,8 @@
 #ifndef INCLUDED_OOK_DECODE_H
 #define INCLUDED_OOK_DECODE_H
 
-#include <gnuradio/block.h>
 #include <ook/api.h>
+#include <gnuradio/block.h>
 
 namespace gr
 {
